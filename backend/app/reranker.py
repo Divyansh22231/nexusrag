@@ -1,4 +1,3 @@
-from flashrank import Ranker, RerankRequest
 from typing import List, Dict
 from app.config import settings
 
@@ -7,6 +6,7 @@ _ranker = None
 def _get_ranker():
     global _ranker
     if _ranker is None:
+        from flashrank import Ranker
         _ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
     return _ranker
 
@@ -14,6 +14,7 @@ def rerank_candidates(query: str, candidates: List[Dict]) -> List[Dict]:
     if not candidates:
         return []
         
+    from flashrank import RerankRequest
     ranker = _get_ranker()
     passages = []
     for c in candidates:
@@ -25,6 +26,8 @@ def rerank_candidates(query: str, candidates: List[Dict]) -> List[Dict]:
         
     rerankrequest = RerankRequest(query=query, passages=passages)
     results = ranker.rerank(rerankrequest)
+    del passages
+    del rerankrequest
     
     sorted_results = sorted(
         results,

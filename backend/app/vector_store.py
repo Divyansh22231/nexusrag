@@ -24,12 +24,18 @@ def add_chunks(chunks: List[Dict]):
         "page": c["page"]
     } for c in chunks]
     
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        metadatas=metadatas,
-        documents=texts
-    )
+    try:
+        collection.add(
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=texts
+        )
+    finally:
+        del texts
+        del embeddings
+        del ids
+        del metadatas
 
 def clear_collection():
     client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIRECTORY)

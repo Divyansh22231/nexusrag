@@ -10,6 +10,7 @@ from app.retrieval import retrieve_context
 from app.reranker import rerank_candidates
 from app.llm import generate_rag_response
 import uuid
+import gc
 
 app = FastAPI(title="NexusRAG Backend")
 
@@ -32,16 +33,26 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
     content = await file.read()
-    pages = extract_text_from_pdf(content)
+    try:
+        pages = extract_text_from_pdf(content)
+    finally:
+        del content
     
     document_id = str(uuid.uuid4())
-    chunks = chunk_document(document_id, file.filename, pages)
+    try:
+        chunks = chunk_document(document_id, file.filename, pages)
+    finally:
+        del pages
     
     if not chunks:
         raise HTTPException(status_code=400, detail="No readable text found in PDF.")
 
     clear_collection()
-    add_chunks(chunks)
+    try:
+        add_chunks(chunks)
+    finally:
+        del chunks
+        gc.collect()
     
     return UploadResponse(document_id=document_id, message="Document processed and indexed.")
 
