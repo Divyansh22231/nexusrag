@@ -1,0 +1,30 @@
+# Environment & Secrets
+.env
+*.env
+!.env.example
+.streamlit/secrets.toml
+
+# Python Caches & Virtual Environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Chroma Vector Database Storage
+data/
+*/data/
+backend/data/
+
+# Logs & Temporary Files
+*.log
+*.tmp
+*.pdf
+
+# Build & Distribution
+node_modules/
+dist/
+build/
+
