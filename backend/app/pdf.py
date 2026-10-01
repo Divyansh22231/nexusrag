@@ -9,14 +9,17 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> List[Dict]:
         for page_num in range(len(doc)):
             page = doc[page_num]
             text = page.get_text("text")
+            del page
             
             # Fix glued numbers from tabular extraction (e.g. 552.00429.00 -> 552.00 429.00)
             text = re.sub(r'(\.\d{2})([0-9\-])', r'\1 \2', text)
             
-            if text.strip():
+            cleaned = text.strip()
+            del text
+            if cleaned:
                 pages.append({
                     "page": page_num + 1,
-                    "text": text.strip()
+                    "text": cleaned
                 })
     finally:
         doc.close()

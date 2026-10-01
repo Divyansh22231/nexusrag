@@ -3,42 +3,54 @@ from typing import List, Dict
 from app.config import settings
 from app.embeddings import get_embeddings
 
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIRECTORY)
+    return _client
+
 def _get_collection():
-    client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIRECTORY)
+    client = _get_client()
     return client.get_or_create_collection(
         name=settings.CHROMA_COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"}
     )
 
-def add_chunks(chunks: List[Dict]):
+def add_chunks(chunks: List[Dict], batch_size: int = 16):
     if not chunks:
         return
     
     collection = _get_collection()
-    texts = [c["text"] for c in chunks]
-    embeddings = get_embeddings(texts)
-    ids = [c["chunk_id"] for c in chunks]
-    metadatas = [c.get("metadata", {
-        "document_id": c.get("document_id", ""),
-        "filename": c.get("filename", ""),
-        "page": c.get("page", 0)
-    }) for c in chunks]
     
-    try:
-        collection.add(
-            ids=ids,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            documents=texts
-        )
-    finally:
-        del texts
-        del embeddings
-        del ids
-        del metadatas
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        texts = [c["text"] for c in batch]
+        embeddings = get_embeddings(texts)
+        ids = [c["chunk_id"] for c in batch]
+        metadatas = [c.get("metadata", {
+            "document_id": c.get("document_id", ""),
+            "filename": c.get("filename", ""),
+            "page": c.get("page", 0)
+        }) for c in batch]
+        
+        try:
+            collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                metadatas=metadatas,
+                documents=texts
+            )
+        finally:
+            del texts
+            del embeddings
+            del ids
+            del metadatas
+            del batch
 
 def clear_collection():
-    client = chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIRECTORY)
+    client = _get_client()
     try:
         client.delete_collection(name=settings.CHROMA_COLLECTION_NAME)
     except Exception:

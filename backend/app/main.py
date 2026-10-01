@@ -37,6 +37,7 @@ async def upload_document(file: UploadFile = File(...)):
         pages = extract_text_from_pdf(content)
     finally:
         del content
+        await file.close()
     
     document_id = str(uuid.uuid4())
     try:
