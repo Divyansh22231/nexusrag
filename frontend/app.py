@@ -306,12 +306,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+def get_backend_url() -> str:
+    url = os.getenv("BACKEND_URL")
+    if not url:
+        try:
+            if hasattr(st, "secrets") and "BACKEND_URL" in st.secrets:
+                url = st.secrets["BACKEND_URL"]
+        except Exception:
+            pass
+    if not url:
+        url = "http://localhost:8000"
+    return url.strip().rstrip("/")
+
+BACKEND_URL = get_backend_url()
 
 @st.cache_data(ttl=10)
 def check_backend_health():
     try:
-        r = httpx.get(f"{BACKEND_URL}/health", timeout=1.5)
+        r = httpx.get(f"{BACKEND_URL}/health", timeout=3.0, follow_redirects=True)
         return r.status_code == 200
     except Exception:
         return False
@@ -376,17 +388,30 @@ with st.sidebar:
                 if st.button("Index Document", type="primary", use_container_width=True):
                     with st.spinner("Processing & indexing document..."):
                         files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+                        upload_success = False
                         try:
-                            response = httpx.post(f"{BACKEND_URL}/upload", files=files, timeout=60.0)
+                            response = httpx.post(
+                                f"{BACKEND_URL}/upload",
+                                files=files,
+                                timeout=60.0,
+                                follow_redirects=True
+                            )
                             if response.status_code == 200:
                                 st.session_state.document_ready = True
                                 st.session_state.document_name = uploaded_file.name
                                 st.session_state.messages = []
-                                st.rerun()
+                                upload_success = True
                             else:
-                                st.error(f"Error: {response.json().get('detail', 'Upload failed')}")
-                        except Exception:
-                            st.error("I couldn't connect to the document assistant. Please try again.")
+                                try:
+                                    err_detail = response.json().get("detail", response.text or "Upload failed")
+                                except Exception:
+                                    err_detail = response.text or f"HTTP {response.status_code}"
+                                st.error(f"Upload failed ({response.status_code}): {err_detail}")
+                        except Exception as e:
+                            st.error(f"I couldn't connect to the document assistant ({BACKEND_URL}): {e}")
+
+                        if upload_success:
+                            st.rerun()
 
     if st.session_state.document_ready:
         st.markdown(f"""
@@ -485,9 +510,19 @@ else:
             full_response = ""
             
             try:
-                with httpx.stream("POST", f"{BACKEND_URL}/chat", json={"message": prompt}, timeout=60.0) as response:
+                with httpx.stream(
+                    "POST",
+                    f"{BACKEND_URL}/chat",
+                    json={"message": prompt},
+                    timeout=60.0,
+                    follow_redirects=True
+                ) as response:
                     if response.status_code != 200:
-                        message_placeholder.error("I couldn't connect to the document assistant. Please try again.")
+                        try:
+                            err_body = response.read().decode()
+                        except Exception:
+                            err_body = f"HTTP {response.status_code}"
+                        message_placeholder.error(f"Error from document assistant ({response.status_code}): {err_body}")
                     else:
                         message_placeholder.empty()
                         for line in response.iter_lines():
@@ -506,8 +541,8 @@ else:
                                         break
                                 except json.JSONDecodeError:
                                     pass
-            except Exception:
-                message_placeholder.error("I couldn't connect to the document assistant. Please try again.")
+            except Exception as e:
+                message_placeholder.error(f"I couldn't connect to the document assistant ({BACKEND_URL}): {e}")
             
             if full_response:
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
