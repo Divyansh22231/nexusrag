@@ -22,6 +22,7 @@ Follow these rules:
 6. For questions requiring comparisons, changes, or calculations between values (such as between years or table rows), compute the comparison directly from the values present in the context.
 7. You may use document metadata (such as document filename) to identify the document subject or topic when asked.
 8. Answer clearly and concisely.
+9. If the user refers to a question by number or identifier (e.g., Q1, Q01, question 1, Q17), identify the corresponding question from the context and provide its complete question and answer.
 
 DOCUMENT CONTEXT:
 {context_str}

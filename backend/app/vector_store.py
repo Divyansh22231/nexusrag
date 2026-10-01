@@ -18,11 +18,11 @@ def add_chunks(chunks: List[Dict]):
     texts = [c["text"] for c in chunks]
     embeddings = get_embeddings(texts)
     ids = [c["chunk_id"] for c in chunks]
-    metadatas = [{
-        "document_id": c["document_id"],
-        "filename": c["filename"],
-        "page": c["page"]
-    } for c in chunks]
+    metadatas = [c.get("metadata", {
+        "document_id": c.get("document_id", ""),
+        "filename": c.get("filename", ""),
+        "page": c.get("page", 0)
+    }) for c in chunks]
     
     try:
         collection.add(
@@ -44,15 +44,21 @@ def clear_collection():
     except Exception:
         pass
 
-def search(query_text: str, k: int) -> List[Dict]:
+def search(query_text: str, k: int, where: Dict = None, where_document: Dict = None) -> List[Dict]:
     collection = _get_collection()
     query_embedding = get_embeddings([query_text])[0]
     
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=k,
-        include=["documents", "metadatas", "distances"]
-    )
+    kwargs = {
+        "query_embeddings": [query_embedding],
+        "n_results": k,
+        "include": ["documents", "metadatas", "distances"]
+    }
+    if where:
+        kwargs["where"] = where
+    if where_document:
+        kwargs["where_document"] = where_document
+        
+    results = collection.query(**kwargs)
     
     if not results["ids"] or not results["ids"][0]:
         return []
